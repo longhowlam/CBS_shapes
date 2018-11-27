@@ -4,6 +4,7 @@ library(maptools)
 library(dplyr)
 library(ggmap)
 library(leaflet)
+library(stringr)
 
 ### shape file van CBS OP buurt nivo, is ontzettend dicht op een kaart
 # https://www.cbs.nl/nl-nl/dossier/nederland-regionaal/geografische%20data/wijk-en-buurtkaart-2018
@@ -21,6 +22,8 @@ tmp = spTransform(tmp, CRS("+proj=longlat +datum=WGS84"))
 #### Het object tmp is een zgn spatialpolygons object, daar zit een data frame in
 tmp@data
 
+PC <- tmp[str_sub(tmp$POSTCODE,1,2) == "10" ,]
+plot(PC)
 
 #### maak een hele simpele plot
 # traditional plot
@@ -43,14 +46,18 @@ NLMap +  geom_polygon(
   fill = NA
 )
 
+pal <- colorQuantile(
+  palette = "Reds",
+  domain = PC$P_GEHUWD, n=9)
 
 ### op leaflet maar dit is net te veel op buurt niveau
-leaflet(tmp) %>%
+leaflet(PC) %>%
   addTiles() %>%
   addPolygons(
-    stroke = TRUE, weight = 1, fillOpacity = 0.15, smoothFactor = 0.15,
-    popup = as.character(tmp$AANT_INW)
-  )
+    stroke = TRUE, weight = 1, fillOpacity = 0.35, smoothFactor = 0.15,
+    popup = as.character(paste(PC$BU_NAAM,PC$P_GEHUWD)),
+    color = ~pal(P_GEHUWD)
+)
 
 
 
