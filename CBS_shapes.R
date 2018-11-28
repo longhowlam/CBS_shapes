@@ -132,7 +132,7 @@ pal <- colorQuantile(
 ptekst = paste(amsterdamPC$BU_NAAM, "<br>",
                "aantal plekken " , amsterdamPC$nplekken, "<br>",
                "aantal inwoners ", amsterdamPC$AANT_INW, "<br>",
-               "percentage ", round(amsterdamPC$parkeerperc,2))
+               "percentage ", 100*round(amsterdamPC$parkeerperc,2))
 leaflet(amsterdamPC) %>%
   addTiles() %>%
   addPolygons(
