@@ -1,36 +1,39 @@
-#### inlezen shape file
+#### voorbeeld code voor inlezen shape files en parkeervakken data Amsterdam #################
+
 library(sp)
 library(maptools)
 library(dplyr)
 library(ggmap)
 library(leaflet)
 library(stringr)
+library(dplyr)
+library(tidyr)
+
 
 ### shape file van CBS OP buurt nivo, is ontzettend dicht op een kaart
-# https://www.cbs.nl/nl-nl/dossier/nederland-regionaal/geografische%20data/wijk-en-buurtkaart-2018
-tmp <- readShapeSpatial("Uitvoer_shape/buurt2018.shp")
 
-tmp <- readShapeSpatial("Uitvoer_shape/gem_2018.shp")
+# https://www.cbs.nl/nl-nl/dossier/nederland-regionaal/geografische%20data/wijk-en-buurtkaart-2018
+CBSbuurten <- readShapeSpatial("Uitvoer_shape/buurt2018.shp")
+CBSgem  <- readShapeSpatial("Uitvoer_shape/gem_2018.shp")
+
+#vanuit opendata gemeente amsterdam
+amsterdamparkeervakken <- read_csv("AmsterdamParkeerplekken.csv")
 
 #### Zet coordinatensysteem
-proj4string(tmp) <- CRS("+init=epsg:28992")
+proj4string(CBSbuurten) <- CRS("+init=epsg:28992")
 
 #### transformeer naar long /lat
-tmp = spTransform(tmp, CRS("+proj=longlat +datum=WGS84"))
+CBSbuurten = spTransform(CBSbuurten, CRS("+proj=longlat +datum=WGS84"))
 
 
-#### Het object tmp is een zgn spatialpolygons object, daar zit een data frame in
-tmp@data
+#### Het object is een zgn spatialpolygons object, daar zit een data frame in
+CBSbuurten@data
 
-PC <- tmp[str_sub(tmp$POSTCODE,1,2) == "10" ,]
-plot(PC)
-
-#### maak een hele simpele plot
-# traditional plot
-plot(tmp)
+amsterdamPC <- CBSbuurten[str_sub(CBSbuurten$POSTCODE,1,2) == "10" ,]
+plot(amsterdamPC)
 
 #ggplot variant
-ggplot(tmp) +
+ggplot(amsterdamPC) +
   geom_polygon(
     aes(x = long, y = lat, group = group),
     color = "grey23", 
@@ -46,21 +49,42 @@ NLMap +  geom_polygon(
   fill = NA
 )
 
+# op een leaflet
 pal <- colorQuantile(
   palette = "Reds",
-  domain = PC$P_GEHUWD, n=9)
+  domain = amsterdamPC$P_GEHUWD, n=9)
 
 ### op leaflet maar dit is net te veel op buurt niveau
-leaflet(PC) %>%
+leaflet(amsterdamPC) %>%
   addTiles() %>%
   addPolygons(
     stroke = TRUE, weight = 1, fillOpacity = 0.35, smoothFactor = 0.15,
-    popup = as.character(paste(PC$BU_NAAM,PC$P_GEHUWD)),
+    popup = as.character(paste(amsterdamPC$BU_NAAM, amsterdamPC$P_GEHUWD)),
     color = ~pal(P_GEHUWD)
 )
 
+########## info over ingelezen parkeervakken #########
+stadsdeel = amsterdamparkeervakken %>% group_by(stadsdeel) %>%  summarise(n=n())
+buurt = amsterdamparkeervakken %>% group_by(buurtcode) %>%  summarise(n=n())
 
+## in WKT staan polygonen met coordinaten die ik er uit wil halen 
+y = tidyr::separate(
+  amsterdamparkeervakken %>%
+    mutate(WKT2 = str_remove(WKT, "POLYGON")) %>% 
+    select(WKT2) , 
+  WKT2, c("kol", "kol2"), sep = ",")
 
+x = str_extract_all(y$kol2, "\\d+\\.\\d+", simplify = TRUE) %>% as_tibble() 
+x$V1 = as.numeric(x$V1)
+x$V2 = as.numeric(x$V2)
 
+amsterdamparkeervakken = bind_cols(amsterdamparkeervakken, x)
 
+# nu nog transformeren naar long lat
+tmp = rd_to_wgs84(amsterdamparkeervakken$V1, amsterdamparkeervakken$V2)
+amsterdamparkeervakken$lat = tmp$phi
+amsterdamparkeervakken$long = tmp$lambda
 
+#check met leaflet
+amsterdamparkeervakken %>% sample_frac(0.0051) %>% 
+leaflet() %>% addTiles() %>% addCircleMarkers(lng=~long, lat = ~lat, popup = ~straatnaam, radius = 1)
