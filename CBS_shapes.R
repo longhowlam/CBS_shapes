@@ -88,3 +88,64 @@ amsterdamparkeervakken$long = tmp$lambda
 #check met leaflet
 amsterdamparkeervakken %>% sample_frac(0.0051) %>% 
 leaflet() %>% addTiles() %>% addCircleMarkers(lng=~long, lat = ~lat, popup = ~straatnaam, radius = 1)
+
+
+## nu kan je met 'over' bepalen in welke CBS buurt een parkeerplek ligt
+adampvakken = amsterdamparkeervakken %>% filter(!is.na(long))
+coordinates(adampvakken) <- ~long + lat
+proj4string(adampvakken) = CRS("+proj=longlat +datum=WGS84")
+
+tmp = sp::over(adampvakken, amsterdamPC)
+
+#combineer nu 
+
+adampvakken = bind_cols(
+  adampvakken@data,
+  adampvakken@coords %>% as.data.frame,
+  tmp
+)
+
+############ nu kan je op CBS BU_NAAM aggregegeren
+adampvakkenBU = adampvakken %>% group_by(BU_NAAM) %>%  summarise(nplekken = n())
+
+### join met amsterdamPC zodat je het op een leaflet kan zetten
+
+tmp = amsterdamPC@data
+tmp2 = tmp %>% left_join(adampvakkenBU)
+tmp2 = tmp2 %>%
+  mutate(
+    parkeerperc = nplekken / AANT_INW
+  )
+
+tmp2 = tmp2 %>% mutate(
+  parkeerperc = ifelse(parkeerperc > 1, NA, parkeerperc ),
+  parkeerperc = ifelse(AANT_INW < 600, NA, parkeerperc )
+)
+amsterdamPC@data = tmp2
+
+# op een leaflet
+pal <- colorQuantile(
+  palette = "Greens",
+  domain = amsterdamPC$parkeerperc, n=9)
+
+### op leaflet maar dit is net te veel op buurt niveau
+ptekst = paste(amsterdamPC$BU_NAAM, "<br>",
+               "aantal plekken " , amsterdamPC$nplekken, "<br>",
+               "aantal inwoners ", amsterdamPC$AANT_INW, "<br>",
+               "percentage ", round(amsterdamPC$parkeerperc,2))
+leaflet(amsterdamPC) %>%
+  addTiles() %>%
+  addPolygons(
+    stroke = TRUE, weight = 1, fillOpacity = 0.35, smoothFactor = 0.15,
+    popup = ptekst,
+    color = ~pal(parkeerperc)
+  )
+
+tmp2 %>%  filter(AANT_INW > 500) %>% 
+ggplot(aes(x=parkeerperc)) + geom_histogram(bins=30, col = "black")
+
+tmp2 %>%  filter(P_GEHUWD > 0) %>% 
+ggplot( aes(x=P_GEHUWD, y = nplekken)) + geom_point() + geom_smooth()
+
+tmp2 %>%  filter(AANT_INW > 500) %>% 
+  ggplot( aes(x=AANT_INW, y = nplekken)) + geom_point() + geom_smooth()
