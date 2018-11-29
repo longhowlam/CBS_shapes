@@ -125,20 +125,37 @@ amsterdamPC@data = tmp2
 
 # op een leaflet
 pal <- colorQuantile(
-  palette = "Greens",
+  palette = "inferno",
   domain = amsterdamPC$parkeerperc, n=9)
 
 ### op leaflet maar dit is net te veel op buurt niveau
-ptekst = paste(amsterdamPC$BU_NAAM, "<br>",
-               "aantal plekken " , amsterdamPC$nplekken, "<br>",
-               "aantal inwoners ", amsterdamPC$AANT_INW, "<br>",
-               "percentage ", 100*round(amsterdamPC$parkeerperc,2))
+ptekst = sprintf(
+  "<strong> %s </stong> </br>
+  aantal parkeerplekken %g </br>
+aantal inwoners %g </br>
+percentage %g
+  ", 
+  amsterdamPC$BU_NAAM,
+  amsterdamPC$nplekken,
+  amsterdamPC$AANT_INW, 
+  100*round(amsterdamPC$parkeerperc,2)
+)%>% lapply(htmltools::HTML)
+
+  
 leaflet(amsterdamPC) %>%
   addTiles() %>%
   addPolygons(
-    stroke = TRUE, weight = 1, fillOpacity = 0.35, smoothFactor = 0.15,
+    stroke = TRUE, weight = 1, fillOpacity = 0.55, smoothFactor = 0.15,
     popup = ptekst,
-    color = ~pal(parkeerperc)
+    color = ~pal(parkeerperc),
+    highlightOptions = highlightOptions(
+      color = "white", weight = 2,
+      bringToFront = TRUE),
+    label = ptekst,
+    labelOptions = labelOptions(
+      style = list("font-weight" = "normal", padding = "3px 8px"),
+      textsize = "15px",
+      direction = "auto")
   )
 
 tmp2 %>%  filter(AANT_INW > 500) %>% 
@@ -148,4 +165,12 @@ tmp2 %>%  filter(P_GEHUWD > 0) %>%
 ggplot( aes(x=P_GEHUWD, y = nplekken)) + geom_point() + geom_smooth()
 
 tmp2 %>%  filter(AANT_INW > 500) %>% 
-  ggplot( aes(x=AANT_INW, y = nplekken)) + geom_point() + geom_smooth()
+  ggplot( aes(x=AANT_INW, y = nplekken)) + 
+  geom_point() +
+  geom_smooth() +
+  scale_x_continuous(breaks = 500*(0:13)) +
+  scale_y_continuous(breaks = 500*(0:6)) +
+  labs(x = "aantal inwoners",
+       y = "aantal parkeerplekken", 
+       title = "Parkeerplekken in Amsterdam",
+       subtitle="elk punt is een wijk in Amsterdam")
